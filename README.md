@@ -32,7 +32,7 @@ Web search, account management, sharing, and document formats beyond PDF/TXT/CSV
 
    The full requirements include PyTorch, sentence-transformers, and FAISS and may take some time to install. The workspace API and frontend can be run without these model packages, but chat answering and document indexing require them.
 
-2. Create a local `.env` file in the repository root and set `GROQ_API_KEY`. Keep the key private; it is read only by the backend.
+2. Copy `.env.example` to `.env` in the repository root and set `GROQ_API_KEY`. Keep the key private; `.env` is excluded from Git and read only by the backend.
 
 3. Install frontend packages:
 
@@ -72,7 +72,7 @@ The root `render.yaml` configures one Render web service that builds the React a
 3. In the new service's **Environment** settings, set `GROQ_API_KEY` to your own Groq API key and set `WORKSPACE_PASSWORD` to a strong private password. Blueprint setup prompts for both values; never commit them to the repository.
 4. Wait for the deploy and health check to finish, then open the service's `onrender.com` URL. The browser prompts for the workspace password before loading private API data. Deployment creates a new, empty workspace; local SQLite data and uploaded files are not uploaded automatically.
 
-The password is only required when `WORKSPACE_PASSWORD` is configured; local development remains unchanged when it is unset. `/api/health` is public for Render's health check and does not return workspace records. Do not use this single-password setup for sensitive multi-user deployments.
+The password is only required when `WORKSPACE_PASSWORD` is configured; local development remains unchanged when it is unset. `/api/health` is public for Render's health check and does not return workspace records. The API has no user authentication in local development unless `WORKSPACE_PASSWORD` is set. Do not use this single-password setup for sensitive multi-user deployments.
 
 ## Data and architecture
 
@@ -99,4 +99,4 @@ cd frontend
 npm run build
 ```
 
-The API is intended for local use and does not provide user authentication.
+The API is intended for local use or a single-password private deployment; it does not provide individual user accounts.

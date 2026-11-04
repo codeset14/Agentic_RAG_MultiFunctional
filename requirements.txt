@@ -1,0 +1,13 @@
+streamlit
+groq
+python-dotenv
+pypdf
+faiss-cpu
+sentence-transformers
+rank-bm25
+numpy
+torch
+scikit-learn
+fastapi>=0.116,<1
+uvicorn[standard]>=0.35,<1
+python-multipart>=0.0.20,<1
