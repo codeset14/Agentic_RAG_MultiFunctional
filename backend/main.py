@@ -1,19 +1,15 @@
 from __future__ import annotations
 
 import asyncio
-import hmac
 import logging
-import os
 import uuid
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,14 +34,7 @@ default_chat_id = workspace.ensure_default_workspace(
     )
 )
 
-password_configured = bool(os.getenv("WORKSPACE_PASSWORD"))
-app = FastAPI(
-    title="Agentic RAG API",
-    version="1.0.0",
-    docs_url=None if password_configured else "/docs",
-    redoc_url=None if password_configured else "/redoc",
-    openapi_url=None if password_configured else "/openapi.json",
-)
+app = FastAPI(title="Agentic RAG API", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -58,28 +47,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.middleware("http")
-async def require_workspace_password(request: Request, call_next):
-    expected_password = os.getenv("WORKSPACE_PASSWORD", "")
-    is_api_request = request.url.path.startswith("/api/")
-    is_health_check = request.url.path == "/api/health"
-    if (
-        expected_password
-        and is_api_request
-        and not is_health_check
-        and request.method != "OPTIONS"
-        and not hmac.compare_digest(
-            request.headers.get("x-workspace-password", "").encode("utf-8"),
-            expected_password.encode("utf-8"),
-        )
-    ):
-        return JSONResponse(
-            status_code=401,
-            content={"detail": "Enter the workspace password to continue."},
-        )
-    return await call_next(request)
 
 
 class ProjectCreate(BaseModel):
@@ -619,33 +586,3 @@ def update_settings(payload: PreferencesUpdate) -> Dict[str, Any]:
     if payload.max_iterations is not None:
         workspace.set_preference("max_iterations", payload.max_iterations)
     return get_settings()
-
-
-FRONTEND_DIST = ROOT / "frontend" / "dist"
-FRONTEND_ASSETS = FRONTEND_DIST / "assets"
-if FRONTEND_ASSETS.is_dir():
-    app.mount("/assets", StaticFiles(directory=FRONTEND_ASSETS), name="frontend-assets")
-
-
-@app.get("/", include_in_schema=False)
-def frontend_index():
-    index_file = FRONTEND_DIST / "index.html"
-    if not index_file.is_file():
-        raise HTTPException(
-            status_code=503,
-            detail="Frontend build is missing. Build frontend/ before serving the app.",
-        )
-    return FileResponse(index_file)
-
-
-@app.get("/{path:path}", include_in_schema=False)
-def frontend_routes(path: str):
-    if path == "api" or path.startswith("api/"):
-        raise HTTPException(status_code=404, detail="API route not found.")
-    index_file = FRONTEND_DIST / "index.html"
-    if not index_file.is_file():
-        raise HTTPException(
-            status_code=503,
-            detail="Frontend build is missing. Build frontend/ before serving the app.",
-        )
-    return FileResponse(index_file)

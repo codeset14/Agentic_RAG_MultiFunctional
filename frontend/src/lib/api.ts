@@ -14,57 +14,6 @@ export const api = axios.create({
   timeout: 120_000,
 });
 
-declare module "axios" {
-  export interface InternalAxiosRequestConfig {
-    workspaceAuthAttempts?: number;
-  }
-}
-
-let passwordPrompt: Promise<string | null> | null = null;
-
-function requestWorkspacePassword(): Promise<string | null> {
-  if (!passwordPrompt) {
-    passwordPrompt = Promise.resolve(
-      window.prompt("Enter the workspace password to continue."),
-    ).finally(() => {
-      passwordPrompt = null;
-    });
-  }
-  return passwordPrompt;
-}
-
-api.interceptors.request.use((config) => {
-  const password = sessionStorage.getItem("workspace-password");
-  if (password) config.headers.set("X-Workspace-Password", password);
-  return config;
-});
-
-api.interceptors.response.use(
-  (response) => response,
-  async (error: unknown) => {
-    if (!axios.isAxiosError(error) || error.response?.status !== 401 || !error.config) {
-      return Promise.reject(error);
-    }
-
-    const config = error.config;
-    const attempts = config.workspaceAuthAttempts ?? 0;
-    if (attempts >= 2) {
-      sessionStorage.removeItem("workspace-password");
-      return Promise.reject(new Error("Incorrect workspace password."));
-    }
-    if (attempts > 0) sessionStorage.removeItem("workspace-password");
-
-    const password =
-      sessionStorage.getItem("workspace-password") ?? await requestWorkspacePassword();
-    if (!password) return Promise.reject(new Error("Workspace password is required."));
-
-    sessionStorage.setItem("workspace-password", password);
-    config.workspaceAuthAttempts = attempts + 1;
-    config.headers.set("X-Workspace-Password", password);
-    return api.request(config);
-  },
-);
-
 export function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const detail: unknown = error.response?.data?.detail;
