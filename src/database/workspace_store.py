@@ -13,6 +13,14 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def _json_default(value: Any) -> Any:
+    if hasattr(value, "tolist"):
+        return value.tolist()
+    if hasattr(value, "item"):
+        return value.item()
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+
 class WorkspaceStore:
     def __init__(self, database_path: str | Path) -> None:
         self.database_path = Path(database_path)
@@ -360,7 +368,7 @@ class WorkspaceStore:
                     chat_id,
                     role,
                     content,
-                    json.dumps(metadata or {}, ensure_ascii=False),
+                    json.dumps(metadata or {}, ensure_ascii=False, default=_json_default),
                     _now(),
                 ),
             )

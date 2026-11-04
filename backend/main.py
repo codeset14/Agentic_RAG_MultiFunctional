@@ -353,43 +353,52 @@ async def send_message(chat_id: str, payload: MessageCreate) -> Dict[str, Any]:
         logger.exception("RAG request failed for conversation %s", chat_id)
         raise HTTPException(status_code=502, detail="RAG request failed. Check backend logs.") from exc
 
-    metadata = {
-        "confidence": response.confidence,
-        "exhausted_retries": response.exhausted_retries,
-        "citations": [
-            {
-                "source": item.chunk.source,
-                "page": item.chunk.page,
-                "score": item.combined_score,
-                "text": item.chunk.text[:1200],
-            }
-            for item in response.citations
-        ],
-        "trace": {
-            "analyzer": response.trace.analyzer.__dict__ if response.trace.analyzer else {},
-            "retrieval": [
+    try:
+        metadata = {
+            "confidence": float(response.confidence),
+            "exhausted_retries": response.exhausted_retries,
+            "citations": [
                 {
-                    "iteration": step.iteration,
-                    "query_used": step.query_used,
-                    "notes": step.notes,
+                    "source": item.chunk.source,
+                    "page": item.chunk.page,
+                    "score": float(item.combined_score),
+                    "text": item.chunk.text[:1200],
                 }
-                for step in response.trace.retrieval_steps
+                for item in response.citations
             ],
-            "reasoning": response.trace.reasoning.__dict__ if response.trace.reasoning else {},
-            "validation": response.trace.validation.__dict__ if response.trace.validation else {},
-            "decisions": [decision.__dict__ for decision in response.trace.decisions],
-        },
-    }
-    assistant_id = workspace.add_message(
-        chat_id, "assistant", response.answer, metadata
-    )
-    return {
-        "user_message_id": user_message_id,
-        "assistant_message": next(
+            "trace": {
+                "analyzer": response.trace.analyzer.__dict__ if response.trace.analyzer else {},
+                "retrieval": [
+                    {
+                        "iteration": step.iteration,
+                        "query_used": step.query_used,
+                        "notes": step.notes,
+                    }
+                    for step in response.trace.retrieval_steps
+                ],
+                "reasoning": response.trace.reasoning.__dict__ if response.trace.reasoning else {},
+                "validation": response.trace.validation.__dict__ if response.trace.validation else {},
+                "decisions": [decision.__dict__ for decision in response.trace.decisions],
+            },
+        }
+        assistant_id = workspace.add_message(
+            chat_id, "assistant", response.answer, metadata
+        )
+        assistant_message = next(
             message
             for message in workspace.list_messages(chat_id)
             if message["message_id"] == assistant_id
-        ),
+        )
+    except Exception as exc:
+        logger.exception("Could not serialize or save RAG response for conversation %s", chat_id)
+        raise HTTPException(
+            status_code=500,
+            detail="The answer was generated but could not be saved. Check backend logs.",
+        ) from exc
+
+    return {
+        "user_message_id": user_message_id,
+        "assistant_message": assistant_message,
     }
 
 

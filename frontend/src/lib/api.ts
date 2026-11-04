@@ -16,9 +16,30 @@ export const api = axios.create({
 
 export function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
-    const detail: unknown = error.response?.data?.detail;
+    const responseData: unknown = error.response?.data;
+    const detail =
+      typeof responseData === "object" && responseData !== null && "detail" in responseData
+        ? responseData.detail
+        : undefined;
     if (typeof detail === "string") return detail;
-    return error.message || "The API could not be reached.";
+    if (Array.isArray(detail)) {
+      const messages = detail
+        .map((item) => {
+          if (typeof item !== "object" || item === null || !("msg" in item)) return null;
+          return typeof item.msg === "string" ? item.msg : null;
+        })
+        .filter((message): message is string => message !== null);
+      if (messages.length) return messages.join("; ");
+    }
+    if (error.response?.status && error.response.status >= 500) {
+      return `The server encountered an error (${error.response.status}). Check the backend terminal for details.`;
+    }
+    if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") {
+      return "The request timed out. Check the backend terminal and try again.";
+    }
+    return error.response
+      ? `Request failed (${error.response.status}).`
+      : "The API could not be reached. Check that the backend is running.";
   }
   return error instanceof Error ? error.message : "Something went wrong.";
 }
